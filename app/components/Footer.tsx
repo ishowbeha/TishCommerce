@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { SiFacebook, SiInstagram, SiLinkedin, SiX, SiYoutube } from "react-icons/si";
+import { SiFacebook, SiInstagram, SiX, SiYoutube } from "react-icons/si";
+import { FaLinkedin } from "react-icons/fa";
 import ScrollToTopButton from "./ScrollToTopButton"; // Keep this as a client component
 import { getLocalization } from "../utils/getLocalization";
 
@@ -9,14 +10,14 @@ interface FooterLink {
   href: string;
 }
 
-type SocialIcon = "SiFacebook" | "SiX" | "SiInstagram" | "SiLinkedin" | "SiYoutube";
+type SocialIcon = "SiFacebook" | "SiX" | "SiInstagram" | "FaLinkedin" | "SiYoutube";
 
 // Map icon strings to components
 const iconMap: Record<SocialIcon, React.ElementType> = {
   SiFacebook: SiFacebook,
   SiX: SiX,
   SiInstagram: SiInstagram,
-  SiLinkedin: SiLinkedin,
+  FaLinkedin: FaLinkedin,
   SiYoutube: SiYoutube
 };
 

@@ -102,7 +102,7 @@ const defaultLocalization: LocalizationData = {
     { id: "facebook", icon: "SiFacebook", url: "https://facebook.com/yourpage" },
     { id: "x", icon: "SiX", url: "https://x.com/yourprofile" },
     { id: "instagram", icon: "SiInstagram", url: "https://instagram.com/yourpage" },
-    { id: "linkedin", icon: "SiLinkedin", url: "https://linkedin.com/in/yourprofile" },
+    { id: "linkedin", icon: "FaLinkedin", url: "https://linkedin.com/in/yourprofile" },
   ],
   homepage: {
     banner: {
