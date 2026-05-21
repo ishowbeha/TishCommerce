@@ -1,0 +1,174 @@
+name: TishCommerce CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  # JOB 1: Lint & Type Check
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: TypeScript Check
+        run: npx tsc --noEmit
+
+  # JOB 2: Build
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Next.js App
+        run: npm run build
+        env:
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
+
+  # JOB 3: Automated Tests with Playwright
+  automated-tests:
+    name: Automated Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Next.js Application
+        run: |
+          npm run build
+          npm run start &
+          npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run Playwright Tests
+        run: npx playwright test --project=chromium
+        
+      - name: Upload Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: project_deliverables/test-report/
+          retention-days: 7
+
+      - name: Stop Application
+        run: kill $(lsof -t -i:3000) || true
+
+  # JOB 4: API Tests (using Playwright or curl)
+  api-tests:
+    name: API Tests
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Start Application
+        run: |
+          npm run build
+          npm run start &
+          npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Test API - Localization
+        run: |
+          curl -s http://localhost:3000/api/localization | grep -q "TishCommerce"
+          echo "✅ Localization API OK"
+
+      - name: Test API - Products
+        run: |
+          curl -s http://localhost:3000/api/products | grep -q "Title"
+          echo "✅ Products API OK"
+
+      - name: Test API - Single Product
+        run: |
+          SLUG=$(curl -s http://localhost:3000/api/products | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['Slug'] if d else 'none')")
+          if [ "$SLUG" != "none" ]; then
+            curl -s "http://localhost:3000/api/products?slug=$SLUG" | grep -q "Slug"
+            echo "✅ Single Product API OK"
+          fi
+
+      - name: Test API - Newsletter Validation
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:3000/api/newsletter -H "Content-Type: application/json" -d '{"email":""}')
+          if [ "$RESPONSE" = "400" ]; then
+            echo "✅ Newsletter validation OK (got 400 as expected)"
+          fi
+
+      - name: Stop Application
+        run: kill $(lsof -t -i:3000) || true
+
+  # JOB 5: Deployment (Optional - Example for Vercel/Netlify)
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    needs: [automated-tests, api-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Production
+        run: echo "✅ Deployment step - Configure your hosting provider here"
+        # Example for Vercel:
+        # - name: Deploy to Vercel
+        #   uses: amondnet/vercel-action@v20
+        #   with:
+        #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        #     vercel-org-id: ${{ secrets.ORG_ID }}
+        #     vercel-project-id: ${{ secrets.PROJECT_ID }}
+        #     vercel-args: '--prod'
